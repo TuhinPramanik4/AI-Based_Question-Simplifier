@@ -7,7 +7,7 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-const genAI = new GoogleGenerativeAI("Enter APIKEY here");
+const genAI = new GoogleGenerativeAI(process.env.API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 app.set('views', path.join(__dirname, 'views'));
@@ -21,7 +21,7 @@ app.post("/Send-Question", async (req, res) => {
     const ques = req.body.question;
     console.log("Question is:", ques);
 
-    const prompt = ques + " simplify this question. and don't provide the solution , you can provide example";
+    const prompt = ques + " simplify this question. and don't provide the solution , you can provide example give the response point wise like 1: , 2: ....";
 
     try {
         const result = await model.generateContent(prompt); 
@@ -31,7 +31,7 @@ app.post("/Send-Question", async (req, res) => {
             const simplifiedText = await result.response.text();  
 
             console.log("Simplified Question:", simplifiedText);
-            res.json({ simplifiedQuestion: simplifiedText });
+            res.send(simplifiedText);
         } else {
             console.error("Unexpected result structure:", result);
             res.status(500).json({ error: "Failed to process response correctly." });

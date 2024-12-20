@@ -3,16 +3,141 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Chat Interface</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            background-color: #000000;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding: 20px;
+            background: #000000;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin: 20px;
+        }
+
+        .message {
+            padding: 10px 15px;
+            border-radius: 20px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            align-self: flex-end;
+            background-color: #007bff;
+            color: #fff;
+        }
+
+        .bot-message {
+            align-self: flex-start;
+            background-color: #e5e5e5;
+            color: #000;
+        }
+
+        .input-container {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .input-container input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+        }
+
+        .input-container button {
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .input-container button:hover {
+            background-color: #0056b3;
+        }
+
+        @media (max-width: 768px) {
+            .chat-container {
+                width: 90%;
+            }
+
+            .input-container {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .input-container button {
+                width: 100%;
+            }
+        }
+    </style>
+    <script>
+        async function handleSubmit(event) {
+            event.preventDefault();
+
+            const inputField = document.getElementById('question');
+            const question = inputField.value.trim();
+
+            if (!question) return;
+
+            addMessage(question, 'user-message');
+            inputField.value = '';
+
+            try {
+                const response = await fetch('/Send-Question', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `question=${encodeURIComponent(question)}`
+                });
+
+                const simplifiedQuestion = await response.text();
+
+                addMessage(simplifiedQuestion, 'bot-message');
+            } catch (error) {
+                console.error('Error:', error);
+                addMessage("An error occurred. Please try again.", 'bot-message');
+            }
+        }
+
+        function addMessage(content, className) {
+            const chatContainer = document.querySelector('.chat-container');
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', className);
+            messageDiv.textContent = content;
+            chatContainer.appendChild(messageDiv);
+
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    </script>
 </head>
 <body>
-    <p>Welcome to Simpliefie-Questions.com</p><br>
-    <p>We are Here to help you in understanding given question to you</p>
-      <form action="/Send-Question" method="post">
-        <label for="question">
-          <input type="text" id="question" name="question" placeholder="Enter you question Here">
-        </label>
-        <button type="submit">Submit</button>
-      </form>
+    <div class="chat-container"></div>
+    <form class="input-container" onsubmit="handleSubmit(event)">
+        <input type="text" id="question" placeholder="Ask your question here..." />
+        <button type="submit">Send</button>
+    </form>
 </body>
 </html>
