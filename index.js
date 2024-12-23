@@ -79,7 +79,7 @@ app.post("/Sign-up", async  (req,res)=>{
         Password: PassWord,
     })
     await NewUser.save();
-    res.render('Sign_in');
+    res.render('Sign-in');
    }catch(e){
         console.log("Somthing Went Wrong");
         res.status(500).send("Internal Server Error")
@@ -100,7 +100,7 @@ app.post("/signin", async (req,res)=>{
                   if(check_For_Mail.Password !=userPassword ){
                     return res.send("Invalid Password");
                   }
-                  return res.send("Signin successful");
+                  return res.render('Chat_Interface')
            }catch(e){
             return res.status(500).send("Something Went Wrong");
            }
