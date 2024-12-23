@@ -29,6 +29,9 @@ app.get("/Sign-up",(req,res)=>{
 app.get("/signin",(req,res)=>{
     res.render('sign-in');
 })
+app.get("/",(req,res)=>{
+    res.render('Start');
+})
 app.post("/Send-Question", async (req, res) => {
     const ques = req.body.question;
     console.log("Question is:", ques);
