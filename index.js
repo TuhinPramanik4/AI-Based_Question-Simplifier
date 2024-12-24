@@ -1,111 +1,126 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const User = require("./db_Schemas/Users");
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
+const User = require('./db_Schemas/Users');
 const path = require('path');
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const bodyparser = require('body-parser');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const cookieParser = require('cookie-parser');
 const app = express();
 
-mongoose.connect('mongodb://localhost:27017/Question-Simplifier').then(()=>{
-    console.log("MongoDB connected");
-});
+const secret = "Tuhin";
+
+// For MongoDB connection
+mongoose.connect('Give your MongoDB connection URL here', { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => console.log("MongoDB connected"))
+    .catch(err => console.error("MongoDB connection error:", err));
+
+// For  Middlewares
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+app.use(cookieParser());
 
-
-
-const genAI = new GoogleGenerativeAI(" ");
+//For Google Generative AI setup
+const genAI = new GoogleGenerativeAI("(Enter your API KEY)");
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
+//For Set up EJS views
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
 
-app.get("/chat", (req, res) => {
-    res.render('Chat-Interface');
-});
-app.get("/Sign-up",(req,res)=>{
-      res.render('SignUP');
-});
-app.get("/signin",(req,res)=>{
-    res.render('sign-in');
-})
-app.get("/",(req,res)=>{
-    res.render('Start');
-})
-app.post("/Send-Question", async (req, res) => {
+//For get request Routes
+app.get('/chat', (req, res) => res.render('Chat'));
+app.get('/sign-up', (req, res) => res.render('SignUP'));
+app.get('/signin', (req, res) => res.render('sign-in'));
+app.get('/', (req, res) => res.render('Start'));
+
+// Helper to verify JWT
+function getUser(token) {
+    try {
+        return jwt.verify(token, secret);
+    } catch (error) {
+        console.error("Invalid Token:", error);
+        return null;
+    }
+}
+
+//For  POST requests
+app.post('/send-question', async (req, res) => {
     const ques = req.body.question;
     console.log("Question is:", ques);
 
-    const prompt = ques + " simplify this question. and don't provide the solution , you can provide example give the response point wise like 1: , 2: ....";
+    const prompt = `${ques} simplify this question. Do not provide the solution. Provide an example and respond point-wise like 1:, 2:, etc.`;
 
     try {
-        const result = await model.generateContent(prompt); 
+        const result = await model.generateContent(prompt);
 
-        if (result && result.response && typeof result.response.text === 'function') {
-            
-            const simplifiedText = await result.response.text();  
-
+        if (result?.response?.text) {
+            const simplifiedText = result.response.text();
             console.log("Simplified Question:", simplifiedText);
-            res.send(simplifiedText);
-        } else {
-            console.error("Unexpected result structure:", result);
-            res.status(500).json({ error: "Failed to process response correctly." });
+            return res.send(simplifiedText);
         }
+
+        console.error("Unexpected result structure:", result);
+        res.status(500).json({ error: "Failed to process response correctly." });
     } catch (error) {
-       
         console.error("Error generating content:", error);
         res.status(500).json({ error: "Failed to generate content." });
     }
 });
-app.post("/Sign-up", async  (req,res)=>{
-   try{
-    console.log("Request Body : ", req.body);
-    const name = String(req.body.UserName);
-    console.log(`User Name: ${name}`);
-    const Mail = String(req.body.email);
-    const PassWord = String( req.body.UserPassword);
-    if(!name || !Mail || !PassWord){
-       return  res.status(400).send("Invalid Credentials");
+
+app.post('/sign-up', async (req, res) => {
+    try {
+        const { UserName, email, UserPassword } = req.body;
+
+        if (!UserName || !email || !UserPassword) {
+            return res.status(400).send("Invalid Credentials");
+        }
+
+        const existingUser = await User.findOne({ Email: email });
+        if (existingUser) {
+            return res.status(400).send("Account already exists. Please sign in.");
+        }
+
+        const hashedPassword = await bcrypt.hash(UserPassword, 10);
+
+        const newUser = new User({
+            Name: UserName,
+            Email: email,
+            Password: hashedPassword,
+        });
+        await newUser.save();
+        res.render('sign-in');
+    } catch (error) {
+        console.error("Error during sign-up:", error);
+        res.status(500).send("Internal Server Error");
     }
-    const Check_for_Existing_User  = await User.findOne({
-        Email : Mail
-    });
-     if(Check_for_Existing_User){
-        return res.status(400).send("Account already Exixst , Please Sign in ");
-     }
-    const NewUser = new User({
-        Name: name ,
-        Email: Mail ,
-        Password: PassWord,
-    })
-    await NewUser.save();
-    res.render('Sign-in');
-   }catch(e){
-        console.log("Somthing Went Wrong");
-        res.status(500).send("Internal Server Error")
-   }
 });
 
-app.post("/signin", async (req,res)=>{
-           try{
-              const Usermail = req.body.UserMail;
-              const userPassword = req.body.PassWord;
+app.post('/signin', async (req, res) => {
+    try {
+        const { UserMail, PassWord } = req.body;
 
-                  const check_For_Mail = await User.findOne({
-                    Email: Usermail
-                  })
-                  if(!check_For_Mail){
-                     return res.send("Account does not Exists ");
-                  }
-                  if(check_For_Mail.Password !=userPassword ){
-                    return res.send("Invalid Password");
-                  }
-                  return res.render('Chat_Interface')
-           }catch(e){
-            return res.status(500).send("Something Went Wrong");
-           }
-})
+        const user = await User.findOne({ Email: UserMail });
+        if (!user) {
+            return res.status(400).send("Account does not exist.");
+        }
 
+        const isMatch = await bcrypt.compare(PassWord, user.Password);
+        if (!isMatch) {
+            return res.status(400).send("Invalid Password.");
+        }
+
+        const token = jwt.sign({ id: user._id, email: user.Email }, secret, { expiresIn: '1h' });
+        res.cookie('uuid', token, { httpOnly: true, secure: true, sameSite: 'strict' });
+
+        res.render('Chat');
+    } catch (error) {
+        console.error("Error during sign-in:", error);
+        res.status(500).send("Something went wrong. Please try again later.");
+    }
+});
+
+//  To Start the server
 app.listen(8000, () => {
     console.log("Server started at port: 8000");
 });
